@@ -1,13 +1,19 @@
 require('dotenv').config();
+const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const projectRoutes = require('./routes/projectRoutes');
 
 const app = express();
+
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true
+}));
 
 // --- 🚀 AUTOMATED DIRECTORY CREATION MATRIX ---
 // Formulate the path directly to your frontend's public/tour_assets folder on the D drive
