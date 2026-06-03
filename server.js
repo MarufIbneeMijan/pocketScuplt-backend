@@ -15,6 +15,8 @@ app.use(cors({
     credentials: true
 }));
 
+app.use(express.json());
+
 // --- 🚀 AUTOMATED DIRECTORY CREATION MATRIX ---
 // Formulate the path directly to your frontend's public/tour_assets folder on the D drive
 const uploadDir = path.join('D:', 'pocketsculpt-saas', 'frontend', 'public', 'tour_assets');
