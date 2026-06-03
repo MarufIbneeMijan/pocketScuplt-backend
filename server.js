@@ -139,6 +139,13 @@ app.use('/api/projects', projectRoutes);
 console.log("🔗 [ROUTING LAYER] REST core endpoints mapped cleanly to /api/projects");
 
 
+app.use('/tour_assets', express.static(uploadDir, {
+    maxAge: '31536000000', // Forces browser network memory to store the panoramas for 1 year
+    immutable: true
+}));
+console.log("📦 [ASSETS MATRIX] Static distribution network engine mounted on /tour_assets route.");
+
+
 // --- 🔌 DATABASE INTEGRITY CONNECTION PIPELINE & LISTENER ENGINE ---
 const PORT = process.env.PORT || 5000;
 const fallbackURI = "mongodb+srv://maruf:maruf123MM@cluster0.ty5muei.mongodb.net/tourStudio?retryWrites=true&w=majority&srvServiceName=mongodb";
