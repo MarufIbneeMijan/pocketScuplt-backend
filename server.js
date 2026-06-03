@@ -11,7 +11,7 @@ const app = express();
 
 // --- 🛡️ INITIALIZE GLOBAL MIDDLEWARE (DECLARED ONCE) ---
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173',"https://pocket-sculpt-frontend.vercel.app/"],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173',"https://pocket-sculpt-frontend.vercel.app"],
     credentials: true
 }));
 app.use(express.json());
