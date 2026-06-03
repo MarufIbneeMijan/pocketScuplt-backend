@@ -2,7 +2,6 @@ require('dotenv').config();
 const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
-
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
@@ -10,63 +9,80 @@ const projectRoutes = require('./routes/projectRoutes');
 
 const app = express();
 
+// --- 🛡️ INITIALIZE GLOBAL MIDDLEWARE (DECLARED ONCE) ---
 app.use(cors({
     origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
     credentials: true
 }));
-
 app.use(express.json());
 
-// --- 🚀 AUTOMATED DIRECTORY CREATION MATRIX ---
-// Formulate the path directly to your frontend's public/tour_assets folder on the D drive
-const uploadDir = path.join('D:', 'pocketsculpt-saas', 'frontend', 'public', 'tour_assets');
+console.log("⚙️ [SYSTEM STARTUP] Core middleware bundles initialized successfully.");
 
-// If the tour_assets folder doesn't exist on the drive, Node.js will create it automatically
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(`✓ Directory Created: ${uploadDir}`);
+// --- 🚀 DYNAMIC MULTI-ENVIRONMENT DISK DIRECTORY MATRIX ---
+let uploadDir;
+
+// Detect whether the backend is running in the cloud (Render) or locally on your desktop
+if (process.env.NODE_ENV === 'production' || !fs.existsSync('D:')) {
+    // Cloud Production Path: Saves to a safe tracking subfolder inside the cloud deployment directory
+    uploadDir = path.join(__dirname, 'public', 'tour_assets');
+    console.log("☁️ [ENVIRONMENT DETECTED]: PRODUCTION CLOUD SERVER");
+} else {
+    // Local Desktop Development Pathway: Defaults back to your fast local folder matching your exact drive setup
+    uploadDir = path.join('D:', 'pocketsculpt-saas', 'frontend', 'public', 'tour_assets');
+    console.log("💻 [ENVIRONMENT DETECTED]: LOCAL WINDOWS WORKSTATION");
 }
 
-// Configure Multer storage engine parameters
+console.log(`📂 [FILESYSTEM TARGET] Setting target asset storage engine path to: ${uploadDir}`);
+
+// Build folder safely if it doesn't exist inside the target node footprint yet
+try {
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        console.log(`✓ [FILESYSTEM] Fresh target destination subdirectory successfully compiled: ${uploadDir}`);
+    }
+} catch (dirErr) {
+    console.error(`❌ [FILESYSTEM CRITICAL] Directory generation failure dropped:`, dirErr.message);
+}
+
+// Configure Multer storage parameters
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir); // Save files directly inside the generated D drive path
+        console.log(`📥 [MULTER BLOCK] Incoming stream packet detected: "${file.originalname}". Mapping write parameters...`);
+        cb(null, uploadDir); 
     },
     filename: (req, file, cb) => {
-        // Keeps the original filename cleanly (e.g., master_bedroom.jpg)
         cb(null, file.originalname);
     }
 });
 
 const upload = multer({ storage: storage });
 
-// --- MIDDLEWARE SYSTEM SETUP ---
-app.use(cors());
-app.use(express.json());
 
 // --- 📡 MULTIPART MULTIMEDIA API ENDPOINT ---
-// This endpoint catches physical file binaries from the frontend form and processes them
-// 📡 THE COMBINED ENGINE ENDPOINT: PROCESSES IMAGES AND MUTATES MONGODB DATA SIMULTANEOUSLY
 app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
-        console.log("\n--- UNIFIED MULTIPART STREAM CAPTURED ---");
-        console.log("Captured Metadata Strings (req.body):", req.body);
-        console.log("Captured File Properties (req.file):", req.file?.filename);
-        console.log("-----------------------------------------");
+        console.log("\n==================================================================");
+        console.log("📡 [INCOMING API TRAFFIC] POST Request intercepted at /api/upload");
+        console.log("==================================================================");
+        console.log("📦 Body Form Parameters (req.body):", JSON.stringify(req.body, null, 2));
+        console.log("🖼️ File Payload Parameter (req.file):", req.file ? {
+            filename: req.file.filename,
+            size: `${(req.file.size / 1024).toFixed(2)} KB`,
+            path: req.file.path
+        } : "⚠️ NULL - STREAM DROPPED");
+        console.log("------------------------------------------------------------------");
 
         if (!req.file) {
+            console.error("⚠️ [UPLOAD REJECTED] Form stream data compiled without an attached image component binary.");
             return res.status(400).json({ success: false, message: "Upload stream file payload missing." });
         }
 
-        // 🔍 Read the parameters out of the incoming text streams safely
         const receivedTitle = req.body.roomTitle || "Staged Unit Space Node";
         const receivedDesc = req.body.roomDesc || "No custom property layout specifications provided.";
         
-        // Formulate standard production URL file references paths strings tags
         const webFilePath = `/tour_assets/${req.file.originalname}`;
-        const uniqueKey = receivedTitle.toLowerCase().replace(/\s+/g, '_') || `room_${Date.now()}`;
+        const uniqueKey = receivedTitle.toLowerCase().trim().replace(/\s+/g, '_') || `room_${Date.now()}`;
 
-        // Build a perfect sub-document dataset map block matching your model schemas
         const freshRoomPayloadNode = {
             key: uniqueKey,
             title: receivedTitle,
@@ -76,71 +92,70 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             infoTags: []
         };
 
-        // Resolve the target parent project database tracking record identifier out of the HTTP referer URL header string!
-        // const urlSegments = req.headers.referer ? req.headers.referer.split('/') : [];
-        // const projectId = urlSegments[urlSegments.length - 1];
         const projectId = req.body.projectId;
+        console.log(`🔍 [METADATA READ] Validating tracking payload arguments. Target Project Target ID: "${projectId}"`);
+
         if (!projectId || projectId.length !== 24) {
-            return res.status(400).json({ success: false, message: "Could not safely resolve parent Project ID from reference headers." });
+            console.error(`❌ [VALIDATION FAILED] Evaluated Project ID parameter string "${projectId}" is invalid or structurally malformed.`);
+            return res.status(400).json({ success: false, message: "Invalid or malformed target parent Project ID format." });
         }
 
-        console.log(`[DB MATRIX] Injecting room metadata node into Project ID document: ${projectId}`);
+        const Project = require('./models/Project'); 
+        console.log(`⏳ [DB QUERY] Fetching parent project footprint dataset out of database collections...`);
         
-        // Import your Mongoose Model dynamically inside the endpoint execution thread scope
-        const Project = require('./models/Project'); // Adjust this file path line matching your structure if needed!
-
-        // Find the project, push the fresh sub-array node block, and execute the save parameters action loops
         const projectToUpdate = await Project.findById(projectId);
         if (!projectToUpdate) {
+            console.error(`❌ [DATA MISMATCH] No matching project entry located under tracking database footprint string: ${projectId}`);
             return res.status(404).json({ success: false, message: "Parent project container footprint missing from collections database." });
         }
 
-        // Append the new room array configuration map cleanly
+        console.log(`✓ [DB READ SUCCESS] Core template located: "${projectToUpdate.name}". Merging mutation arrays...`);
         projectToUpdate.rooms = [...(projectToUpdate.rooms || []), freshRoomPayloadNode];
         
-        // Handle setting initial landing page entrance coordinates index reference links fallbacks
         if (!projectToUpdate.initialRoomKey) {
+            console.log(`📌 [INITIALIZATION SETTING] Auto-assigning room key "${uniqueKey}" as entry tracking viewport baseline.`);
             projectToUpdate.initialRoomKey = uniqueKey;
         }
 
         const savedProjectData = await projectToUpdate.save();
-        console.log(`✓ Database write execution matrix verified and committed for project: "${savedProjectData.name}"`);
+        console.log(`💾 [DB WRITE EXECUTED] Document write transaction committed cleanly for project: "${savedProjectData.name}"`);
 
-        // Return everything back to the frontend to trigger immediate UI re-rendering tracks
         res.json({
             success: true,
             filePath: webFilePath,
             newRoomKey: uniqueKey,
             updatedProject: savedProjectData,
-            message: "File successfully written to disk and metadata committed to MongoDB."
+            message: "File successfully written to disk and metadata committed to MongoDB Atlas."
         });
 
     } catch (err) {
-        console.error("Critical Upload & Database Append Crash Exception dropped:", err);
+        console.error("💥 [ENDPOINT CRASH] Critical runtime exception dropped inside upload handling stream:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
 // --- CORE REST API ROUTER MAPPING ---
 app.use('/api/projects', projectRoutes);
+console.log("🔗 [ROUTING LAYER] REST core endpoints mapped cleanly to /api/projects");
 
-// --- DATABASE INTEGRITY CONNECTION PIPELINE ---
+
+// --- 🔌 DATABASE INTEGRITY CONNECTION PIPELINE & LISTENER ENGINE ---
 const PORT = process.env.PORT || 5000;
-const databaseUrl = process.env.MONGO_URI;
-
-console.log("⏳ Attempting to initialize cloud handshake with MongoDB Atlas...");
-
-
-console.log("⏳ Attempting to initialize cloud handshake with MongoDB Atlas...");
-
-// 🚀 PORT 443 TUNNEL OVERRIDE: Forces MongoDB traffic over the standard secure HTTPS port
 const fallbackURI = "mongodb+srv://maruf:maruf123MM@cluster0.ty5muei.mongodb.net/tourStudio?retryWrites=true&w=majority&srvServiceName=mongodb";
+
+console.log("\n⏳ Attempting to initialize cloud handshake with MongoDB Atlas over Tunnel Port 443...");
 
 mongoose.connect(fallbackURI)
     .then(() => {
         console.log("==================================================================");
         console.log("🚀 SUCCESS: Connected smoothly to your live MongoDB Atlas Cluster!");
         console.log("==================================================================");
+        
+        // 🚀 THE MISSING ENGINE LINK: Open the web routing gates ONLY after a clean DB match!
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🌐 LIVE LINK ACTIVE: Network data pipelines listening on port: ${PORT}`);
+            console.log("==================================================================\n");
+        });
     })
     .catch(err => {
         console.error("\n❌ [DATABASE CRASH] Connection handshake failed!");
