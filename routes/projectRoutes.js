@@ -1,3 +1,4 @@
+// routes.js
 const router = require('express').Router();
 const Project = require('../models/Project');
 const cloudinary = require('cloudinary').v2;
@@ -5,7 +6,6 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
 // 🔒 CLOUD CONFIGURATION INTERFACE
-// In production, these variables must be saved securely in your server's .env file
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -18,7 +18,6 @@ const storage = new CloudinaryStorage({
     params: {
         folder: 'virtual_tours_panoramas',
         allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-        // Automatically optimizes resolution and applies smart compression for fast WebGL loading
         transformation: [{ quality: 'auto:good', fetch_format: 'auto' }] 
     }
 });
@@ -56,8 +55,7 @@ router.post('/create', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// 🚀 PRODUCTION EXCLUSIVE: APPEND NEW ROOM VIA CLOUD FILE UPLOAD
-// Intercepts multi-part binary forms, uploads to CDN, updates document array
+// 🚀 APPEND NEW ROOM VIA CLOUD FILE UPLOAD
 // ─────────────────────────────────────────────────────────────────
 router.post('/:id/add-room', uploadCloud.single('panorama'), async (req, res) => {
     const { id } = req.params;
@@ -74,32 +72,31 @@ router.post('/:id/add-room', uploadCloud.single('panorama'), async (req, res) =>
             return res.status(400).json({ error: "Validation Missing: Room title name field is required." });
         }
 
-        // If a file was sent, multer automatically places the permanent absolute HTTPS link here
         const permanentCDNUrl = req.file ? req.file.path : "/tour_assets/room_0.jpg";
         console.log(`[CLOUD STREAM COMPLETE] Image uploaded successfully. CDN Asset URI: ${permanentCDNUrl}`);
 
-        // Construct clean unique routing slug key matching your existing frontend structure
         const distinctRoomKey = title.toLowerCase().trim().replace(/\s+/g, '-');
 
-        // Check for unique key collisions to avoid schema mapping overwrites
         const keyExists = project.rooms.some(r => String(r.key).toLowerCase().trim() === distinctRoomKey);
         if (keyExists) {
             return res.status(400).json({ error: "Key Collision Error: A room with an identical title configuration already exists." });
         }
 
+        // 🌟 CHANGE 1: Explicitly initialize an empty array node tracking target subdocuments
         const newRoomNode = {
             key: distinctRoomKey,
             title,
             description: description || undefined,
-            image: permanentCDNUrl, // Stored as a highly available public link strings asset
+            image: permanentCDNUrl, 
             hotspots: [],
-            infoTags: []
+            infoTags: [],
+            customCtas: [] // 👈 NEW PARAMETER ASSIGNED HERE FOR MODEL REDRAW UNIFORMITY
         };
 
         project.rooms.push(newRoomNode);
         const updatedProject = await project.save();
 
-        console.log(`✓ [DATABASE SYNCED] Room "${title}" appended cleanly to MongoDB.`);
+        console.log(`✓ [DATABASE SYNCED] Room "${title}" appended cleanly to MongoDB with custom CTA handlers.`);
         res.status(201).json(updatedProject);
 
     } catch (err) {
@@ -109,15 +106,60 @@ router.post('/:id/add-room', uploadCloud.single('panorama'), async (req, res) =>
 });
 
 // ─────────────────────────────────────────────────────────────────
-// ⚙️ UPDATE EXISTING PROJECT OR OVERWRITE/APPEND ROOM MARKERS
+// ⚙️ ATOMIC LOCATION PATH: LOCK AND SYNCHRONIZE MARKER NODE BUNDLES
+// Matches the exact endpoint format targeted by the updated front-end editor
+// ─────────────────────────────────────────────────────────────────
+router.put('/:id/room/:roomKey/markers', async (req, res) => {
+    const { id, roomKey } = req.params;
+    const { hotspots, infoTags, customCtas } = req.body;
+    
+    console.log(`\n--- 📡 [ATOMIC MARKER SYNC] PUT Request Received for Project ID: ${id} | Room Key: ${roomKey} ---`);
+    
+    try {
+        const cleanRoomKey = String(roomKey).toLowerCase().trim();
+
+        // 🌟 CHANGE 2: Utilize Mongoose positional logic ($) to isolate the target room subdocument array path cleanly
+        const updatedProject = await Project.findOneAndUpdate(
+            { 
+                _id: id, 
+                "rooms.key": cleanRoomKey 
+            },
+            {
+                $set: {
+                    "rooms.$.hotspots": hotspots || [],
+                    "rooms.$.infoTags": infoTags || [],
+                    "rooms.$.customCtas": customCtas || [] // 👈 Dynamic CTA updates synchronized atomically here
+                }
+            },
+            { 
+                new: true, 
+                runValidators: true 
+            }
+        );
+
+        if (!updatedProject) {
+            console.warn(`⚠️ [MUTATION MISMATCH] Could not find matching project or room key structure.`);
+            return res.status(404).json({ error: "Layout alignment target path error: project instance or target room identifier missing." });
+        }
+
+        console.log(`✓ [DATABASE POSITION SECURED] Marker channels for room "${cleanRoomKey}" safely synced and serialized.`);
+        res.json(updatedProject);
+
+    } catch (err) {
+        console.error("❌ [DATABASE ERROR] Transaction exception inside markers update route:", err.message);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// ⚙️ PRE-EXISTING GENERIC UPDATE ENDPOINT FOR OVERALL METADATA
 // ─────────────────────────────────────────────────────────────────
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    console.log(`\n--- 📡 [DATABASE MUTATION] PUT Request Received for ID: ${id} ---`);
+    console.log(`\n--- 📡 [DATABASE MUTATION] PUT Generic Project Request Received for ID: ${id} ---`);
     
     try {
         if (req.body.rooms && !Array.isArray(req.body.rooms)) {
-            console.error("❌ [MUTATION ABORTED] Malformed payload received: 'rooms' must be an array.");
             return res.status(400).json({ error: "Malformed Payload: rooms property must evaluate to an array." });
         }
 
@@ -129,22 +171,18 @@ router.put('/:id', async (req, res) => {
         const updatedProject = await Project.findByIdAndUpdate(
             id, 
             updateData, 
-            { 
-                new: true,             
-                runValidators: true    
-            }
+            { new: true, runValidators: true }
         );
 
         if (!updatedProject) {
-            console.warn(`⚠️ [MUTATION FAILED] Document registry target ID missing: ${id}`);
             return res.status(404).json({ error: "Target project registry instance not found." });
         }
 
-        console.log("✓ [DATABASE MUTATION] Workspace structure cleanly serialized and saved to MongoDB.");
+        console.log("✓ [DATABASE MUTATION] Base workspace fields metadata successfully updated.");
         res.json(updatedProject);
         
     } catch (err) { 
-        console.error("❌ [DATABASE ERROR] Transaction exception dropped inside PUT handler:", err.message);
+        console.error("❌ [DATABASE ERROR] Transaction exception dropped inside generic PUT handler:", err.message);
         res.status(400).json({ error: err.message }); 
     }
 });

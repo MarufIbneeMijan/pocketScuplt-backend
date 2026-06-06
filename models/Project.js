@@ -14,13 +14,24 @@ const InfoTagSchema = new mongoose.Schema({
     pitch: { type: Number, required: true }
 });
 
+const CustomCtaSchema = new mongoose.Schema({
+    type: { type: String, enum: ["floating", "spatial"], default: "floating" }, 
+    text: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    link: { type: String, required: true, trim: true }, // The destination URL redirect target
+    yaw: { type: Number },   // Optional/Nullable if placement type is global floating HUD
+    pitch: { type: Number }
+});
+
+
 const RoomSchema = new mongoose.Schema({
     key: { type: String, required: true },
     title: { type: String, required: true },
     image: { type: String, required: true }, // Local path or cloud URL string
     description: { type: String, default: "" },
     hotspots: [HotspotSchema],
-    infoTags: [InfoTagSchema]
+    infoTags: [InfoTagSchema],
+    customCtas: [CustomCtaSchema]
 });
 
 const ProjectSchema = new mongoose.Schema({
