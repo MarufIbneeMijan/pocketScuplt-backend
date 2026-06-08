@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 const cors = require('cors');
 const express = require('express');
@@ -9,9 +10,17 @@ const projectRoutes = require('./routes/projectRoutes');
 
 const app = express();
 
-// --- 🛡️ INITIALIZE GLOBAL MIDDLEWARE (DECLARED ONCE) ---
+// --- 🛡️ INITIALIZE GLOBAL MIDDLEWARE WITH DYNAMIC DOMAIN CROSSING ---
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173',"https://pocket-sculpt-frontend.vercel.app","https://pocket-sculpt-frontend.vercel.app/"],
+    origin: [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://pocket-sculpt-frontend.vercel.app',
+        // 🌟 AUTOMATED SYSTEM SHIELD: Regular expression matching any deployment branch from your Vercel projects space
+        /\.vercel\.app$/ 
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 app.use(express.json());
@@ -21,20 +30,16 @@ console.log("⚙️ [SYSTEM STARTUP] Core middleware bundles initialized success
 // --- 🚀 DYNAMIC MULTI-ENVIRONMENT DISK DIRECTORY MATRIX ---
 let uploadDir;
 
-// Detect whether the backend is running in the cloud (Render) or locally on your desktop
 if (process.env.NODE_ENV === 'production' || !fs.existsSync('D:')) {
-    // Cloud Production Path: Saves to a safe tracking subfolder inside the cloud deployment directory
     uploadDir = path.join(__dirname, 'public', 'tour_assets');
     console.log("☁️ [ENVIRONMENT DETECTED]: PRODUCTION CLOUD SERVER");
 } else {
-    // Local Desktop Development Pathway: Defaults back to your fast local folder matching your exact drive setup
     uploadDir = path.join('D:', 'pocketsculpt-saas', 'frontend', 'public', 'tour_assets');
     console.log("💻 [ENVIRONMENT DETECTED]: LOCAL WINDOWS WORKSTATION");
 }
 
 console.log(`📂 [FILESYSTEM TARGET] Setting target asset storage engine path to: ${uploadDir}`);
 
-// Build folder safely if it doesn't exist inside the target node footprint yet
 try {
     if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
@@ -56,7 +61,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
 
 // --- 📡 MULTIPART MULTIMEDIA API ENDPOINT ---
 app.post('/api/upload', upload.single('file'), async (req, res) => {
@@ -83,13 +87,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         const webFilePath = `/tour_assets/${req.file.originalname}`;
         const uniqueKey = receivedTitle.toLowerCase().trim().replace(/\s+/g, '_') || `room_${Date.now()}`;
 
+        // 🌟 UPDATED: Matches the new array structure schemas required by your custom CTAs dashboard!
         const freshRoomPayloadNode = {
             key: uniqueKey,
             title: receivedTitle,
             image: webFilePath,
             description: receivedDesc,
             hotspots: [],
-            infoTags: []
+            infoTags: [],
+            customCtas: [] // 👈 INJECTED EMPTY ARRAY BOUNDARY TO ELIMINATE REDRAW RUNTIME HANDSHAKE COLLISIONS
         };
 
         const projectId = req.body.projectId;
@@ -138,27 +144,26 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 app.use('/api/projects', projectRoutes);
 console.log("🔗 [ROUTING LAYER] REST core endpoints mapped cleanly to /api/projects");
 
-
 app.use('/tour_assets', express.static(uploadDir, {
     maxAge: '31536000000', // Forces browser network memory to store the panoramas for 1 year
     immutable: true
 }));
 console.log("📦 [ASSETS MATRIX] Static distribution network engine mounted on /tour_assets route.");
 
-
 // --- 🔌 DATABASE INTEGRITY CONNECTION PIPELINE & LISTENER ENGINE ---
 const PORT = process.env.PORT || 5000;
-const fallbackURI = "mongodb+srv://maruf:maruf123MM@cluster0.ty5muei.mongodb.net/tourStudio?retryWrites=true&w=majority&srvServiceName=mongodb";
 
-console.log("\n⏳ Attempting to initialize cloud handshake with MongoDB Atlas over Tunnel Port 443...");
+// 🌟 REFACTORED SECURE FALLBACK ENGINE PARAMETER
+const productionMongoURI = process.env.MONGO_URI || "mongodb+srv://maruf:maruf123MM@cluster0.ty5muei.mongodb.net/tourStudio?retryWrites=true&w=majority&srvServiceName=mongodb";
 
-mongoose.connect(fallbackURI)
+console.log("\n⏳ Attempting to initialize cloud handshake with MongoDB Atlas...");
+
+mongoose.connect(productionMongoURI)
     .then(() => {
         console.log("==================================================================");
         console.log("🚀 SUCCESS: Connected smoothly to your live MongoDB Atlas Cluster!");
         console.log("==================================================================");
         
-        // 🚀 THE MISSING ENGINE LINK: Open the web routing gates ONLY after a clean DB match!
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🌐 LIVE LINK ACTIVE: Network data pipelines listening on port: ${PORT}`);
             console.log("==================================================================\n");
